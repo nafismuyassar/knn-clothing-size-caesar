@@ -1,6 +1,5 @@
 """
 app.py — Streamlit App: Prediksi Ukuran Pakaian (KNN + CAESAR)
-Skripsi: Nafis Muyassar | Universitas Amikom Yogyakarta | 2024
 """
 import pickle
 import numpy as np
