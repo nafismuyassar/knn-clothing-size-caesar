@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import streamlit as st
 
+# Menggunakan Path agar aman saat deploy di Streamlit Cloud
 MODEL_PATH = Path(__file__).parent / "model" / "model.pkl"
 SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL"]
 
@@ -21,12 +22,10 @@ EN13402 = {
     },
 }
 
-
 @st.cache_resource
 def load_model():
     with open(MODEL_PATH, "rb") as f:
         return pickle.load(f)
-
 
 def do_predict(artefak, gender_int, height, weight, chest, waist, hip):
     bmi = weight / (height / 100) ** 2
@@ -41,271 +40,183 @@ def do_predict(artefak, gender_int, height, weight, chest, waist, hip):
     dist  = {artefak["size_order"][i]: float(p) * 100 for i, p in enumerate(proba)}
     return size, conf, round(float(bmi), 1), dist
 
-
 def bmi_category(bmi):
     if bmi < 18.5: return "Berat badan kurang"
     if bmi < 25:   return "Berat badan normal"
     if bmi < 30:   return "Kelebihan berat badan"
     return "Obesitas"
 
-
-# ── Page config ─────────────────────────────────────────────────────────────
+# ── Setup ────────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="FitSize — Prediksi Ukuran Pakaian",
-    page_icon="📏", # Menggunakan ikon penggaris (standar, bukan emoji ekspresif)
+    page_icon="📏",
     layout="centered",
 )
 
-# Memaksa Streamlit menggunakan Light Mode (mencegah bug hitam di form)
-st.markdown("""
-<script>
-    // Script kecil untuk memastikan tema terang
-    if (window.parent.document.documentElement.getAttribute('data-theme') === 'dark') {
-        window.parent.document.documentElement.setAttribute('data-theme', 'light');
-    }
-</script>
-""", unsafe_allow_html=True)
-
-# ── CSS injection ───────────────────────────────────────────────────────────
+# ── CSS INJECTION (MODERN & CLEAN) ───────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-    --primary: #4F46E5;
-    --primary-hover: #4338CA;
-    --bg: #F4F7FB; /* Background abu kebiruan yang sangat halus */
-    --card-bg: #FFFFFF;
-    --text-main: #1E293B; /* Slate gelap untuk teks utama */
+    --primary: #2563EB;
+    --primary-hover: #1D4ED8;
+    --bg-color: #F8FAFC;
+    --text-main: #1E293B;
     --text-muted: #64748B;
     --border: #E2E8F0;
 }
 
-/* ========== GLOBAL & TYPOGRAPHY ========== */
+/* Global Font & Background */
 html, body, [class*="css"] {
-    font-family: 'Outfit', sans-serif !important;
+    font-family: 'Inter', sans-serif !important;
     color: var(--text-main);
 }
-.stApp { background-color: var(--bg) !important; }
+.stApp {
+    background-color: var(--bg-color) !important;
+}
 
-/* Sembunyikan elemen Streamlit */
+/* Hide Streamlit Header/Footer */
 #MainMenu, footer, header, [data-testid="stHeader"] { visibility: hidden !important; }
 
-.block-container {
-    max-width: 720px !important;
-    padding-top: 3rem !important;
-    padding-bottom: 2rem !important;
-}
+/* Container width */
+.block-container { max-width: 720px !important; padding-top: 3rem !important; }
 
+/* Typography */
 h1, h2, h3 { font-weight: 600 !important; color: var(--text-main) !important; letter-spacing: -0.02em !important; }
 
-/* ========== HERO ========== */
-.hero { text-align: center; margin-bottom: 2rem; }
-.hero h1 {
-    font-size: 2.8rem !important;
-    color: var(--text-main) !important;
-    margin-bottom: 0.5rem !important;
-    font-weight: 700 !important;
-}
-.hero p { color: var(--text-muted); font-size: 1.05rem; max-width: 450px; margin: 0 auto; line-height: 1.6; }
+/* Custom Header */
+.app-header { text-align: center; margin-bottom: 2rem; }
+.app-header h1 { font-size: 2.5rem !important; color: var(--text-main) !important; margin-bottom: 0.5rem !important; font-weight: 700 !important; }
+.app-header p { color: var(--text-muted); font-size: 1rem; margin: 0; }
 
-/* ========== SECTION TITLE ========== */
-.section-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--text-main);
-    margin: 0 0 1.5rem 0;
-    display: flex;
-    align-items: center;
-}
-.section-title::before {
-    content: ''; display: inline-block; width: 4px; height: 18px;
-    background: var(--primary); border-radius: 2px; margin-right: 10px;
-}
-
-/* ========== FORM CARD ========== */
+/* Form Card Container */
 .form-card {
-    background: var(--card-bg);
+    background: #FFFFFF;
     border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 2rem;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
-    margin-bottom: 2rem;
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    margin-bottom: 1.5rem;
 }
 
-/* ========== INPUTS (Memperbaiki bug hitam) ========== */
-[data-testid="stNumberInput"] label, [data-testid="stRadio"] > label {
-    font-weight: 500 !important;
-    color: var(--text-main) !important;
-    font-size: 0.9rem !important;
-    margin-bottom: 0.4rem !important;
-}
-
-/* Input Field */
+/* Input Styling (Fix Dark Mode Bug) */
+[data-testid="stNumberInput"] label { font-weight: 500 !important; font-size: 0.85rem !important; color: var(--text-muted) !important; }
 [data-testid="stNumberInput"] input {
-    border-radius: 8px !important;
+    border-radius: 6px !important;
     border: 1px solid var(--border) !important;
-    padding: 0.6rem 0.8rem !important;
+    padding: 0.5rem 0.75rem !important;
     background-color: #F8FAFC !important;
     color: var(--text-main) !important;
-    font-weight: 500 !important;
 }
-[data-testid="stNumberInput"] input:focus {
-    border-color: var(--primary) !important;
-    background-color: #FFFFFF !important;
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1) !important;
-}
+[data-testid="stNumberInput"] input:focus { border-color: var(--primary) !important; background-color: #FFFFFF !important; }
 
-/* Tombol +/- (FIX BUG HITAM) */
+/* Tombol +/- agar tidak hitam */
 [data-testid="stNumberInput"] button {
     background-color: #F1F5F9 !important;
     color: var(--text-main) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 6px !important;
+    border-left: 1px solid var(--border) !important;
 }
-[data-testid="stNumberInput"] button:hover {
-    background-color: #E2E8F0 !important;
-    color: var(--primary) !important;
-}
+[data-testid="stNumberInput"] button:hover { background-color: #E2E8F0 !important; color: var(--primary) !important; }
 
-/* ========== RADIO BUTTON (FIX BUG TEKS HILANG) ========== */
-[data-testid="stRadio"] > div[role="radiogroup"] {
-    gap: 10px !important;
-    flex-direction: row !important;
-}
+/* Radio Button Styling (Fix Teks Hilang) */
+[data-testid="stRadio"] > label { font-weight: 500 !important; font-size: 0.85rem !important; color: var(--text-muted) !important; }
+[data-testid="stRadio"] div[role="radiogroup"] { gap: 12px !important; flex-direction: row !important; }
 [data-testid="stRadio"] label {
     background: #F8FAFC !important;
     border: 1px solid var(--border) !important;
-    border-radius: 8px !important;
-    padding: 10px 24px !important;
+    border-radius: 6px !important;
+    padding: 8px 24px !important;
     cursor: pointer !important;
-    transition: all 0.2s ease !important;
+    transition: all 0.2s !important;
 }
-[data-testid="stRadio"] label:hover { border-color: var(--primary) !important; }
-
 /* Sembunyikan lingkaran radio */
 [data-testid="stRadio"] label > div:first-child { display: none !important; }
+/* Paksa teks gelap saat tidak dipilih */
+[data-testid="stRadio"] label p { color: var(--text-main) !important; font-weight: 500 !important; margin: 0 !important; }
+/* Saat dipilih */
+[data-testid="stRadio"] label:has(input:checked) { background: var(--primary) !important; border-color: var(--primary) !important; }
+[data-testid="stRadio"] label:has(input:checked) p { color: #FFFFFF !important; }
 
-/* Paksa teks selalu berwarna gelap saat TIDAK terpilih */
-[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p {
-    color: var(--text-main) !important;
-    font-weight: 500 !important;
-    margin: 0 !important;
-}
-
-/* Saat TERPILIH */
-[data-testid="stRadio"] label:has(input:checked) {
-    background: var(--primary) !important;
-    border-color: var(--primary) !important;
-}
-[data-testid="stRadio"] label:has(input:checked) [data-testid="stMarkdownContainer"] p {
-    color: #FFFFFF !important;
-    font-weight: 600 !important;
-}
-
-/* ========== BUTTON ========== */
+/* Primary Button */
 .stButton > button {
     background: var(--primary) !important;
-    border: none !important;
-    border-radius: 8px !important;
-    padding: 12px 24px !important;
-    font-weight: 600 !important;
-    font-size: 1rem !important;
     color: white !important;
-    box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2) !important;
-    transition: all 0.2s ease !important;
-    width: 100%;
+    border: none !important;
+    border-radius: 6px !important;
+    padding: 10px 24px !important;
+    font-weight: 500 !important;
+    font-size: 1rem !important;
+    transition: all 0.2s !important;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2) !important;
 }
-.stButton > button:hover {
-    background: var(--primary-hover) !important;
-    transform: translateY(-1px);
-    box-shadow: 0 6px 8px -1px rgba(79, 70, 229, 0.3) !important;
-}
+.stButton > button:hover { background: var(--primary-hover) !important; transform: translateY(-1px); }
 
-/* ========== METRIC (BMI) ========== */
+/* Metric Box */
 [data-testid="stMetric"] {
     background: #F8FAFC !important;
-    padding: 16px !important;
+    padding: 12px 16px !important;
     border-radius: 8px !important;
     border: 1px solid var(--border) !important;
 }
-[data-testid="stMetricLabel"] { color: var(--text-muted) !important; font-weight: 500 !important; }
-[data-testid="stMetricValue"] { color: var(--text-main) !important; font-weight: 700 !important; }
+[data-testid="stMetricLabel"] { color: var(--text-muted) !important; font-weight: 500 !important; font-size: 0.85rem !important; }
+[data-testid="stMetricValue"] { color: var(--text-main) !important; font-weight: 700 !important; font-size: 1.8rem !important; }
 
-/* ========== HASIL PREDIKSI ========== */
+/* Result Card */
 .result-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 2rem;
+    background: #FFFFFF;
+    border: 2px solid var(--primary);
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
-    margin-bottom: 2rem;
+    margin: 1.5rem 0;
+    box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.1);
 }
-.result-label {
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-muted);
-    font-weight: 600;
-    margin-bottom: 0.5rem;
-}
-.result-size { font-size: 3.5rem; font-weight: 700; line-height: 1; color: var(--primary); }
-.result-standard { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem; }
-.result-right { text-align: right; }
-.conf-value { font-size: 2rem; font-weight: 600; color: var(--text-main); margin: 0.25rem 0; }
-.conf-bar { width: 120px; height: 6px; background: #E2E8F0; border-radius: 3px; overflow: hidden; margin-left: auto; }
-.conf-fill { height: 100%; background: var(--primary); border-radius: 3px; }
+.result-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600; margin-bottom: 0.25rem; }
+.result-value { font-size: 3rem; font-weight: 800; line-height: 1; color: var(--primary); }
+.result-sub { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem; }
 
-/* ========== DISTRIBUTION BARS ========== */
-.dist-list { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem; }
-.dist-row { display: flex; align-items: center; gap: 15px; margin: 12px 0; }
-.dist-label { width: 40px; font-weight: 500; font-size: 0.9rem; color: var(--text-muted); }
-.dist-bar { flex: 1; height: 6px; background: #F1F5F9; border-radius: 3px; overflow: hidden; }
-.dist-fill { height: 100%; border-radius: 3px; background: #CBD5E1; }
-.dist-row.pred .dist-fill { background: var(--primary); }
-.dist-pct { width: 45px; text-align: right; font-weight: 500; font-size: 0.85rem; color: var(--text-muted); }
-.dist-row.pred .dist-pct, .dist-row.pred .dist-label { color: var(--primary); font-weight: 600; }
+/* Progress Bar Customization */
+.stProgress > div > div > div > div { background-color: var(--primary) !important; }
+.stProgress > div > div > div { background-color: #E2E8F0 !important; }
 
-/* ========== TABLE ========== */
-.size-table-wrap { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 1.5rem; }
-.size-table-wrap table { width: 100%; border-collapse: collapse; }
-.size-table-wrap th { background: #F8FAFC; padding: 14px 16px; text-align: left; font-size: 0.85rem; color: var(--text-muted); border-bottom: 1px solid var(--border); font-weight: 500; }
-.size-table-wrap td { padding: 14px 16px; border-bottom: 1px solid var(--border); font-size: 0.95rem; color: var(--text-main); }
-.size-table-wrap tr:last-child td { border-bottom: none; }
-.size-table-wrap tr.pred-row td { background: #EEF2FF; font-weight: 600; color: var(--primary); }
+/* Custom Table */
+.custom-table { width: 100%; border-collapse: collapse; margin-top: 1rem; background: #FFFFFF; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+.custom-table th { background: #F8FAFC; padding: 12px 16px; text-align: left; font-size: 0.85rem; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+.custom-table td { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 0.95rem; color: var(--text-main); }
+.custom-table tr:last-child td { border-bottom: none; }
+.custom-table tr.pred-row td { background: #EFF6FF; font-weight: 600; color: var(--primary); }
 
-/* ========== EXPANDER & INFO ========== */
-[data-testid="stExpander"] { border: 1px solid var(--border) !important; border-radius: 12px !important; background: var(--card-bg) !important; }
-[data-testid="stExpander"] summary { padding: 12px 16px !important; font-weight: 500 !important; color: var(--text-main) !important; }
-div[data-testid="stAlert"] { border-radius: 8px !important; border: 1px solid #BFDBFE !important; background: #EFF6FF !important; }
-div[data-testid="stAlert"] p { color: #1E40AF !important; font-size: 0.9rem !important; }
+/* Expander & Alert */
+[data-testid="stExpander"] { border: 1px solid var(--border) !important; border-radius: 8px !important; background: #FFFFFF !important; }
+[data-testid="stExpander"] summary { font-weight: 500 !important; color: var(--text-main) !important; }
+[data-testid="stAlert"] { border-radius: 8px !important; background: #F8FAFC !important; border: 1px solid var(--border) !important; }
+[data-testid="stAlert"] p { color: var(--text-main) !important; font-size: 0.9rem !important; }
 </style>
 """, unsafe_allow_html=True)
 
 
-# ── Load model ──────────────────────────────────────────────────────────────
+# ── Load Model ───────────────────────────────────────────────────────────────
 try:
     artefak = load_model()
 except FileNotFoundError:
-    st.error("Model tidak ditemukan. Pastikan folder `model/model.pkl` sudah di-commit ke repo GitHub Anda.")
+    st.error("Model tidak ditemukan. Jalankan `python train_model.py` dulu.")
     st.stop()
 
-
-# ── Hero header ─────────────────────────────────────────────────────────────
+# ── Header ───────────────────────────────────────────────────────────────────
 st.markdown("""
-<div class="hero">
+<div class="app-header">
     <h1>FitSize</h1>
-    <p>Prediksi ukuran pakaian yang pas untukmu — berdasarkan ukuran tubuh & standar EN 13402</p>
+    <p>Prediksi ukuran pakaian berdasarkan ukuran tubuh & standar EN 13402</p>
 </div>
 """, unsafe_allow_html=True)
 
-
-# ── Form Input (Dibungkus dalam Card) ───────────────────────────────────────
+# ── Form Input (Dibungkus Card) ──────────────────────────────────────────────
 st.markdown('<div class="form-card">', unsafe_allow_html=True)
-st.markdown('<div class="section-title">Data Tubuh</div>', unsafe_allow_html=True)
+st.subheader("Data Tubuh")
+st.markdown("<br>", unsafe_allow_html=True)
 
 gender = st.radio("Jenis Kelamin", ["Pria", "Wanita"], horizontal=True)
 
@@ -318,83 +229,67 @@ with col2:
     waist  = st.number_input("Lingkar Pinggang (cm)",    min_value=40.0,  max_value=200.0, value=90.0,  step=0.5)
     hip    = st.number_input("Lingkar Pinggul (cm)",     min_value=50.0,  max_value=200.0, value=100.0, step=0.5)
     
-    # BMI Metric
     bmi_now = weight / (height / 100) ** 2
-    st.metric("BMI (otomatis)", f"{bmi_now:.1f}", help=bmi_category(bmi_now), delta_color="off")
-    
+    st.metric("BMI (otomatis)", f"{bmi_now:.1f}")
+    st.caption(bmi_category(bmi_now))
+
 st.markdown('</div>', unsafe_allow_html=True)
 
-
-# ── Prediksi ────────────────────────────────────────────────────────────────
-if st.button("Prediksi Ukuran Saya", type="primary"):
+# ── Prediksi ─────────────────────────────────────────────────────────────────
+if st.button("Prediksi Ukuran", type="primary", use_container_width=True):
     gender_int = 0 if gender == "Pria" else 1
     size, conf, bmi_val, dist = do_predict(
         artefak, gender_int, height, weight, chest, waist, hip)
 
-    # Result Card
+    # Hasil Utama (Custom Card)
     st.markdown(f"""
     <div class="result-card">
-        <div class="result-left">
-            <div class="result-label">Rekomendasi Ukuran</div>
-            <div class="result-size">{size}</div>
-            <div class="result-standard">Standar EN 13402 · {gender}</div>
+        <div>
+            <div class="result-title">Ukuran Rekomendasi</div>
+            <div class="result-value">{size}</div>
+            <div class="result-sub">Standar EN 13402 · {gender}</div>
         </div>
-        <div class="result-right">
-            <div class="result-label">Tingkat Keyakinan</div>
-            <div class="conf-value">{conf:.1f}%</div>
-            <div class="conf-bar"><div class="conf-fill" style="width:{conf:.1f}%"></div></div>
+        <div style="text-align: right;">
+            <div class="result-title">Tingkat Keyakinan</div>
+            <div style="font-size: 2rem; font-weight: 700; color: var(--text-main); margin-top: 0.25rem;">{conf:.1f}%</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Distribution
-    st.markdown('<div class="section-title">Distribusi Probabilitas</div>', unsafe_allow_html=True)
-    rows = ""
+    # Distribusi
+    st.subheader("Distribusi Prediksi")
+    st.caption("Berdasarkan 15 tetangga terdekat (k=15)")
+    
     for s in SIZE_ORDER:
         pct = dist.get(s, 0)
         is_pred = (s == size)
-        row_class = "dist-row pred" if is_pred else "dist-row"
-        rows += f"""
-        <div class="{row_class}">
-            <div class="dist-label">{s}</div>
-            <div class="dist-bar"><div class="dist-fill" style="width:{pct:.1f}%;"></div></div>
-            <div class="dist-pct">{pct:.1f}%</div>
-        </div>
-        """
-    st.markdown(f'<div class="dist-list">{rows}</div>', unsafe_allow_html=True)
+        label = f"**{s}** (Prediksi)" if is_pred else s
+        st.progress(int(pct), text=f"{label} — {pct:.1f}%")
 
-    # Table EN 13402
-    st.markdown(f'<div class="section-title">Rentang EN 13402 — {gender}</div>', unsafe_allow_html=True)
+    st.divider()
+
+    # Tabel EN 13402 (Custom HTML)
+    st.subheader(f"Rentang EN 13402 — {gender}")
     tbl = EN13402[gender]
     col_header = "Lingkar Dada" if gender == "Pria" else "Bust"
-
-    table_rows = ""
+    
+    table_html = f"<table class='custom-table'><thead><tr><th>Ukuran</th><th>{col_header}</th><th>Status</th></tr></thead><tbody>"
     for s in SIZE_ORDER:
         is_pred = (s == size)
-        row_class = 'pred-row' if is_pred else ''
+        row_class = "pred-row" if is_pred else ""
         mark = "Rekomendasi" if is_pred else "—"
-        table_rows += f"""
-        <tr class="{row_class}">
-            <td><strong>{s}</strong></td>
-            <td>{tbl[s]}</td>
-            <td>{mark}</td>
-        </tr>
-        """
-    st.markdown(f"""
-    <div class="size-table-wrap">
-        <table>
-            <thead>
-                <tr><th>Ukuran</th><th>{col_header}</th><th>Status</th></tr>
-            </thead>
-            <tbody>{table_rows}</tbody>
-        </table>
-    </div>
-    """, unsafe_allow_html=True)
+        table_html += f"<tr class='{row_class}'><td><strong>{s}</strong></td><td>{tbl[s]}</td><td>{mark}</td></tr>"
+    table_html += "</tbody></table>"
+    
+    st.markdown(table_html, unsafe_allow_html=True)
 
-    st.info("Catatan: Prediksi berdasarkan data CAESAR (Amerika/Eropa) & standar EN 13402. Ukuran aktual tiap merek pakaian bisa berbeda.")
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.info(
+        "Prediksi berdasarkan data CAESAR (Amerika/Eropa) & standar EN 13402. "
+        "Ukuran aktual tiap merek pakaian bisa berbeda — gunakan sebagai referensi."
+    )
 
-
-# ── Info model ──────────────────────────────────────────────────────────────
+# ── Info Model ───────────────────────────────────────────────────────────────
 with st.expander("Tentang Model"):
     k   = artefak.get("k", "?")
     wv  = artefak.get("w_val", "?")
@@ -412,3 +307,10 @@ with st.expander("Tentang Model"):
 | Hold-out Accuracy | **{acc:.2f}%** |
 | Hold-out F1-macro | **{f1:.2f}%** |
 """)
+
+# ── Footer ───────────────────────────────────────────────────────────────────
+st.divider()
+st.caption(
+    "Prediksi Ukuran Pakaian Menggunakan Algoritma K-Nearest Neighbor "
+    "dengan Pembobotan Fitur Lingkar Dada pada Dataset CAESAR."
+)
