@@ -3,10 +3,12 @@ app.py — Streamlit App: Prediksi Ukuran Pakaian (KNN + CAESAR)
 Nafis Muyassar
 """
 import pickle
+from pathlib import Path
 import numpy as np
 import streamlit as st
 
-MODEL_PATH = "model/model.pkl"
+# Menggunakan pathlib agar aman saat di-deploy di Streamlit Cloud
+MODEL_PATH = Path(__file__).parent / "model" / "model.pkl"
 SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL"]
 
 EN13402 = {
@@ -53,491 +55,308 @@ st.set_page_config(
     page_title="FitSize — Prediksi Ukuran Pakaian",
     page_icon="👕",
     layout="centered",
-    initial_sidebar_state="collapsed",
 )
 
 
-# ── CSS injection ───────────────────────────────────────────────────────────
+# ── CSS injection (VERSI PERBAIKAN) ─────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-    --primary: #4F46E5;
-    --primary-2: #7C3AED;
+    --primary: #4F46E5; /* Indigo solid, tidak neko-neko */
     --bg: #F8FAFC;
     --card: #FFFFFF;
-    --text: #0F172A;
-    --muted: #64748B;
+    --text-main: #0F172A;
+    --text-muted: #475569; /* Lebih gelap agar terbaca */
     --border: #E2E8F0;
 }
 
 /* ========== GLOBAL ========== */
 html, body, [class*="css"] {
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
-    color: var(--text);
+    font-family: 'Inter', sans-serif !important;
+    color: var(--text-main);
 }
 
 .stApp {
-    background:
-        radial-gradient(circle at 15% 0%, rgba(79, 70, 229, 0.10) 0%, transparent 45%),
-        radial-gradient(circle at 85% 100%, rgba(124, 58, 237, 0.10) 0%, transparent 45%),
-        #F8FAFC !important;
+    background-color: var(--bg) !important;
 }
 
-/* Hide Streamlit chrome */
+/* Sembunyikan elemen bawaan Streamlit */
 #MainMenu, footer, header, [data-testid="stHeader"] {
     visibility: hidden !important;
-    height: 0 !important;
 }
 
-/* Container width */
-.block-container, [data-testid="stMainBlockContainer"] {
-    max-width: 840px !important;
-    padding-top: 2rem !important;
-    padding-bottom: 4rem !important;
+.block-container {
+    max-width: 760px !important;
+    padding-top: 3rem !important;
 }
 
 /* ========== TYPOGRAPHY ========== */
 h1, h2, h3 {
-    font-family: 'Plus Jakarta Sans', sans-serif !important;
     font-weight: 700 !important;
-    color: var(--text) !important;
+    color: var(--text-main) !important;
     letter-spacing: -0.02em !important;
 }
-
-.stCaption, [data-testid="stCaptionContainer"] {
-    color: var(--muted) !important;
-    font-size: 0.85rem !important;
-    line-height: 1.5 !important;
+p {
+    color: var(--text-main) !important;
 }
 
 /* ========== HERO ========== */
 .hero {
     text-align: center;
-    padding: 1.5rem 1rem 1rem;
+    padding-bottom: 2rem;
 }
 .hero-icon {
-    font-size: 3.5rem;
+    font-size: 3rem;
     display: inline-block;
-    animation: float 3s ease-in-out infinite;
-}
-@keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-6px); }
+    margin-bottom: 1rem;
 }
 .hero h1 {
-    font-size: 3rem !important;
-    background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 55%, #EC4899 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin: 0.25rem 0 0.75rem !important;
-    font-weight: 800 !important;
+    font-size: 2.5rem !important;
+    color: var(--primary) !important;
+    margin-bottom: 0.5rem !important;
 }
 .hero p {
-    color: var(--muted);
-    font-size: 1rem;
-    max-width: 480px;
+    color: var(--text-muted);
+    font-size: 1.05rem;
+    max-width: 450px;
     margin: 0 auto;
-    line-height: 1.6;
-}
-
-/* ========== DIVIDER ========== */
-hr {
-    border: none !important;
-    height: 1px !important;
-    background: linear-gradient(90deg, transparent, #E2E8F0 20%, #E2E8F0 80%, transparent) !important;
-    margin: 1.75rem 0 !important;
 }
 
 /* ========== SECTION TITLE ========== */
 .section-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin: 1.5rem 0 1rem;
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--text);
-    margin: 1.5rem 0 1rem;
 }
 .section-title::before {
     content: '';
+    display: inline-block;
     width: 4px;
-    height: 20px;
-    background: linear-gradient(180deg, var(--primary), var(--primary-2));
-    border-radius: 4px;
+    height: 18px;
+    background: var(--primary);
+    border-radius: 2px;
+    margin-right: 10px;
 }
 
 /* ========== INPUTS ========== */
-[data-testid="stNumberInput"] label,
-[data-testid="stRadio"] label p {
+[data-testid="stNumberInput"] label, [data-testid="stRadio"] > label {
     font-weight: 600 !important;
-    color: var(--text) !important;
-    font-size: 0.875rem !important;
+    color: var(--text-main) !important;
+    font-size: 0.9rem !important;
+    margin-bottom: 0.25rem !important;
 }
 
 [data-testid="stNumberInput"] input {
-    border-radius: 10px !important;
-    border: 1.5px solid var(--border) !important;
-    padding: 0.55rem 0.85rem !important;
-    font-weight: 500 !important;
+    border-radius: 8px !important;
+    border: 1px solid var(--border) !important;
+    padding: 0.6rem 0.8rem !important;
     background: var(--card) !important;
-    transition: all 0.2s ease !important;
-    font-size: 0.95rem !important;
+    color: var(--text-main) !important;
 }
 [data-testid="stNumberInput"] input:focus {
     border-color: var(--primary) !important;
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12) !important;
-}
-[data-testid="stNumberInput"] button {
-    background: transparent !important;
-    border: none !important;
-    color: var(--muted) !important;
-    border-radius: 6px !important;
-}
-[data-testid="stNumberInput"] button:hover {
-    background: rgba(79, 70, 229, 0.08) !important;
-    color: var(--primary) !important;
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.15) !important;
 }
 
-/* Radio as pills */
-[data-testid="stRadio"] > div {
-    gap: 8px !important;
-    flex-wrap: wrap;
+/* Perbaikan tombol +/- agar tidak hitam */
+[data-testid="stNumberInput"] button {
+    background-color: #F1F5F9 !important;
+    color: var(--text-main) !important;
+    border-left: 1px solid var(--border) !important;
+}
+[data-testid="stNumberInput"] button:hover {
+    background-color: #E2E8F0 !important;
+    color: var(--primary) !important;
+}
+[data-testid="stNumberInput"] button svg {
+    fill: var(--text-main) !important;
+}
+
+/* ========== RADIO BUTTON (PERBAIKAN TOTAL) ========== */
+[data-testid="stRadio"] > div[role="radiogroup"] {
+    gap: 1rem !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
 }
 [data-testid="stRadio"] label {
     background: var(--card) !important;
-    border: 1.5px solid var(--border) !important;
-    border-radius: 999px !important;
-    padding: 8px 20px !important;
-    transition: all 0.2s ease !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    padding: 10px 20px !important;
     cursor: pointer !important;
-    margin-right: 0 !important;
+    transition: all 0.2s ease !important;
 }
 [data-testid="stRadio"] label:hover {
     border-color: var(--primary) !important;
     background: #EEF2FF !important;
 }
-[data-testid="stRadio"] label:has(input:checked) {
-    background: linear-gradient(135deg, var(--primary), var(--primary-2)) !important;
-    border-color: transparent !important;
-}
-[data-testid="stRadio"] label:has(input:checked) p {
-    color: white !important;
-}
-[data-testid="stRadio"] label > div:first-of-type {
+/* Menyembunyikan lingkaran radio bawaan tapi teks tetap ada */
+[data-testid="stRadio"] label > div:first-child {
     display: none !important;
+}
+[data-testid="stRadio"] label div[data-testid="stMarkdownContainer"] p {
+    color: var(--text-muted) !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+    margin: 0 !important;
+}
+/* Saat terpilih */
+[data-testid="stRadio"] label:has(input:checked) {
+    border-color: var(--primary) !important;
+    background: var(--primary) !important;
+}
+[data-testid="stRadio"] label:has(input:checked) div[data-testid="stMarkdownContainer"] p {
+    color: white !important;
 }
 
 /* ========== BUTTON ========== */
-.stButton > button[kind="primary"],
-.stButton > button[data-testid="baseButton-primary"] {
-    background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%) !important;
+.stButton > button {
+    background: var(--primary) !important;
     border: none !important;
-    border-radius: 12px !important;
-    padding: 14px 24px !important;
-    font-weight: 700 !important;
-    font-size: 16px !important;
+    border-radius: 8px !important;
+    padding: 12px 24px !important;
+    font-weight: 600 !important;
+    font-size: 1rem !important;
     color: white !important;
-    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35) !important;
+    box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2) !important;
     transition: all 0.2s ease !important;
-    letter-spacing: 0.01em !important;
 }
-.stButton > button[kind="primary"]:hover,
-.stButton > button[data-testid="baseButton-primary"]:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(79, 70, 229, 0.45) !important;
-}
-.stButton > button[kind="primary"]:active,
-.stButton > button[data-testid="baseButton-primary"]:active {
-    transform: translateY(0);
+.stButton > button:hover {
+    background: #4338CA !important;
+    box-shadow: 0 6px 8px -1px rgba(79, 70, 229, 0.3) !important;
+    transform: translateY(-1px);
 }
 
 /* ========== METRIC (BMI) ========== */
 [data-testid="stMetric"] {
     background: var(--card) !important;
-    padding: 16px 20px !important;
-    border-radius: 14px !important;
+    padding: 16px !important;
+    border-radius: 12px !important;
     border: 1px solid var(--border) !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
 }
 [data-testid="stMetricLabel"] {
-    color: var(--muted) !important;
+    color: var(--text-muted) !important;
     font-weight: 600 !important;
-    font-size: 0.8rem !important;
 }
 [data-testid="stMetricValue"] {
     color: var(--primary) !important;
     font-weight: 700 !important;
-    font-size: 1.6rem !important;
 }
 
 /* ========== RESULT CARD ========== */
 .result-card {
-    background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
-    border-radius: 20px;
-    padding: 1.75rem 2rem;
-    color: white;
+    background: var(--card);
+    border: 2px solid var(--primary);
+    border-radius: 16px;
+    padding: 2rem;
+    color: var(--text-main);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 2rem;
-    box-shadow: 0 10px 40px -10px rgba(79, 70, 229, 0.45);
-    margin: 1rem 0 1.5rem;
-    position: relative;
-    overflow: hidden;
-    animation: slideUp 0.4s ease;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+    margin: 1.5rem 0;
 }
-@keyframes slideUp {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-.result-card::before {
-    content: '';
-    position: absolute;
-    width: 280px; height: 280px;
-    background: radial-gradient(circle, rgba(255,255,255,0.18), transparent 70%);
-    top: -140px; right: -80px;
-    border-radius: 50%;
-    pointer-events: none;
-}
-.result-card::after {
-    content: '';
-    position: absolute;
-    width: 200px; height: 200px;
-    background: radial-gradient(circle, rgba(236,72,153,0.25), transparent 70%);
-    bottom: -120px; left: -60px;
-    border-radius: 50%;
-    pointer-events: none;
-}
-.result-left, .result-right { position: relative; z-index: 1; }
 .result-label {
-    font-size: 0.75rem;
+    font-size: 0.85rem;
     text-transform: uppercase;
-    letter-spacing: 0.12em;
-    opacity: 0.85;
-    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    font-weight: 600;
     margin-bottom: 0.5rem;
 }
 .result-size {
     font-size: 3.5rem;
     font-weight: 800;
     line-height: 1;
-    letter-spacing: -0.03em;
-    color: white;
+    color: var(--primary);
 }
 .result-standard {
-    font-size: 0.8rem;
-    opacity: 0.75;
+    font-size: 0.85rem;
+    color: var(--text-muted);
     margin-top: 0.5rem;
-    font-weight: 500;
 }
 .result-right { text-align: right; }
-.conf-label {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    opacity: 0.85;
-    font-weight: 700;
-}
 .conf-value {
-    font-size: 1.8rem;
+    font-size: 2rem;
     font-weight: 700;
-    margin: 0.15rem 0 0.5rem;
+    color: var(--text-main);
+    margin: 0.25rem 0;
 }
 .conf-bar {
-    width: 130px;
-    height: 6px;
-    background: rgba(255,255,255,0.25);
-    border-radius: 999px;
+    width: 120px;
+    height: 8px;
+    background: #E2E8F0;
+    border-radius: 4px;
     overflow: hidden;
     margin-left: auto;
 }
 .conf-fill {
     height: 100%;
-    background: white;
-    border-radius: 999px;
-    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-@media (max-width: 600px) {
-    .result-card { flex-direction: column; text-align: center; gap: 1rem; }
-    .result-right { text-align: center; }
-    .conf-bar { margin: 0 auto; }
-    .hero h1 { font-size: 2.2rem !important; }
-    .result-size { font-size: 2.8rem; }
+    background: var(--primary);
+    border-radius: 4px;
 }
 
 /* ========== DISTRIBUTION BARS ========== */
 .dist-list {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 1.25rem 1.25rem 1rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-    margin-top: 0.5rem;
-}
-.dist-header {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--muted);
-    font-weight: 700;
-    margin-bottom: 0.75rem;
+    border-radius: 12px;
+    padding: 1.5rem;
 }
 .dist-row {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin: 10px 0;
+    gap: 15px;
+    margin: 12px 0;
 }
-.dist-label {
-    width: 50px;
-    font-weight: 700;
-    font-size: 0.9rem;
-    color: var(--text);
-    white-space: nowrap;
-}
-.dist-bar {
-    flex: 1;
-    height: 10px;
-    background: #F1F5F9;
-    border-radius: 999px;
-    overflow: hidden;
-}
-.dist-fill {
-    height: 100%;
-    border-radius: 999px;
-    transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.dist-pct {
-    width: 55px;
-    text-align: right;
-    font-weight: 600;
-    font-size: 0.8rem;
-    color: var(--muted);
-}
-.dist-row.pred .dist-label,
-.dist-row.pred .dist-pct {
-    color: var(--primary);
-}
+.dist-label { width: 40px; font-weight: 600; font-size: 0.9rem; }
+.dist-bar { flex: 1; height: 8px; background: #F1F5F9; border-radius: 4px; overflow: hidden; }
+.dist-fill { height: 100%; border-radius: 4px; background: #CBD5E1; }
+.dist-row.pred .dist-fill { background: var(--primary); }
+.dist-pct { width: 50px; text-align: right; font-weight: 600; font-size: 0.85rem; color: var(--text-muted); }
+.dist-row.pred .dist-pct, .dist-row.pred .dist-label { color: var(--primary); }
 
-/* ========== SIZE TABLE ========== */
+/* ========== TABLE ========== */
 .size-table-wrap {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-    margin-top: 0.5rem;
 }
-.size-table-wrap table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 0 !important;
+.size-table-wrap table { width: 100%; border-collapse: collapse; }
+.size-table-wrap th {
+    background: #F8FAFC; padding: 12px 16px; text-align: left;
+    font-size: 0.8rem; color: var(--text-muted); border-bottom: 1px solid var(--border);
 }
-.size-table-wrap thead th {
-    background: #F8FAFC !important;
-    color: var(--muted) !important;
-    text-align: left;
-    padding: 12px 18px !important;
-    font-size: 0.72rem !important;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-weight: 700;
-    border: none !important;
-    border-bottom: 1px solid var(--border) !important;
+.size-table-wrap td {
+    padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 0.95rem;
 }
-.size-table-wrap tbody td {
-    padding: 13px 18px !important;
-    border: none !important;
-    border-bottom: 1px solid #F1F5F9 !important;
-    font-size: 0.92rem;
-    color: var(--text);
-}
-.size-table-wrap tbody tr:last-child td {
-    border-bottom: none !important;
-}
-.size-table-wrap tbody tr.pred-row td {
-    background: linear-gradient(90deg, rgba(79, 70, 229, 0.08), rgba(124, 58, 237, 0.08)) !important;
-    font-weight: 700 !important;
-    color: var(--primary) !important;
-}
-
-/* ========== INFO / ALERT ========== */
-div[data-testid="stAlert"] {
-    border-radius: 14px !important;
-    border: 1px solid #BFDBFE !important;
-    background: #EFF6FF !important;
-    padding: 14px 18px !important;
-}
-div[data-testid="stAlert"] p {
-    color: #1E40AF !important;
-    font-size: 0.875rem !important;
-    line-height: 1.5 !important;
-    font-weight: 500 !important;
-}
+.size-table-wrap tr:last-child td { border-bottom: none; }
+.size-table-wrap tr.pred-row td { background: #EEF2FF; font-weight: 600; color: var(--primary); }
 
 /* ========== EXPANDER ========== */
 [data-testid="stExpander"] {
     border: 1px solid var(--border) !important;
-    border-radius: 14px !important;
+    border-radius: 12px !important;
     background: var(--card) !important;
-    overflow: hidden;
-    margin-top: 1.5rem;
 }
 [data-testid="stExpander"] summary {
-    padding: 14px 20px !important;
+    padding: 12px 16px !important;
     font-weight: 600 !important;
-    font-size: 0.95rem !important;
-}
-[data-testid="stExpander"] summary:hover {
-    background: #F8FAFC !important;
 }
 
-/* Markdown table inside expander */
-[data-testid="stExpander"] .stMarkdown table {
-    border-collapse: separate !important;
-    border-spacing: 0 !important;
-    border-radius: 10px;
-    overflow: hidden;
-    border: 1px solid var(--border) !important;
-    width: 100%;
-    margin-top: 0.5rem;
+/* ========== INFO ========== */
+div[data-testid="stAlert"] {
+    border-radius: 8px !important;
+    border: 1px solid #BFDBFE !important;
+    background: #EFF6FF !important;
 }
-[data-testid="stExpander"] .stMarkdown thead th {
-    background: #F8FAFC !important;
-    padding: 10px 14px !important;
-    text-align: left !important;
-    font-weight: 700 !important;
-    color: var(--muted) !important;
-    font-size: 0.72rem !important;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    border: none !important;
-    border-bottom: 1px solid var(--border) !important;
-}
-[data-testid="stExpander"] .stMarkdown tbody td {
-    padding: 10px 14px !important;
-    border: none !important;
-    border-bottom: 1px solid #F1F5F9 !important;
-    font-size: 0.88rem;
-}
-[data-testid="stExpander"] .stMarkdown tbody tr:last-child td {
-    border-bottom: none !important;
-}
-
-/* ========== FOOTER ========== */
-.app-footer {
-    text-align: center;
-    color: var(--muted);
-    font-size: 0.8rem;
-    line-height: 1.6;
-    padding: 1.5rem 1rem 0;
-}
+div[data-testid="stAlert"] p { color: #1E40AF !important; font-size: 0.9rem !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -546,7 +365,7 @@ div[data-testid="stAlert"] p {
 try:
     artefak = load_model()
 except FileNotFoundError:
-    st.error("Model tidak ditemukan. Jalankan `python train_model.py` dulu.")
+    st.error("Model tidak ditemukan. Pastikan folder `model/model.pkl` sudah di-commit ke repo GitHub.")
     st.stop()
 
 
@@ -563,9 +382,15 @@ st.divider()
 
 
 # ── Form input ──────────────────────────────────────────────────────────────
-st.markdown('<div class="section-title">📋 Data Tubuh</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-title">Data Tubuh</div>', unsafe_allow_html=True)
 
-gender = st.radio("Jenis Kelamin", ["Pria", "Wanita"], horizontal=True)
+# Perbaikan: Streamlit punya st.segmented_control (versi baru) yang jauh lebih bagus dari radio
+# Jika versi streamlit Anda di Cloud mendukung, ini akan otomatis terpakai.
+try:
+    gender = st.segmented_control("Jenis Kelamin", ["Pria", "Wanita"], default="Pria", label_visibility="collapsed")
+    if not gender: gender = "Pria" # Fallback jika user nge-klik sampai kosong
+except AttributeError:
+    gender = st.radio("Jenis Kelamin", ["Pria", "Wanita"], horizontal=True, label_visibility="collapsed")
 
 col1, col2 = st.columns(2, gap="medium")
 with col1:
@@ -576,63 +401,56 @@ with col2:
     waist  = st.number_input("Lingkar Pinggang (cm)",    min_value=40.0,  max_value=200.0, value=90.0,  step=0.5)
     hip    = st.number_input("Lingkar Pinggul (cm)",     min_value=50.0,  max_value=200.0, value=100.0, step=0.5)
     bmi_now = weight / (height / 100) ** 2
-    st.metric("BMI (otomatis)", f"{bmi_now:.1f}")
-    st.caption(bmi_category(bmi_now))
+    st.metric("BMI (otomatis)", f"{bmi_now:.1f}", help=bmi_category(bmi_now), delta_color="off")
 
 st.divider()
 
 
 # ── Prediksi ────────────────────────────────────────────────────────────────
-if st.button("🔍  Prediksi Ukuran Saya", type="primary", use_container_width=True):
+if st.button("Prediksi Ukuran Saya", type="primary", use_container_width=True):
     gender_int = 0 if gender == "Pria" else 1
     size, conf, bmi_val, dist = do_predict(
         artefak, gender_int, height, weight, chest, waist, hip)
 
-    # Result card
     st.markdown(f"""
     <div class="result-card">
         <div class="result-left">
-            <div class="result-label">🎯 Ukuran Rekomendasi</div>
+            <div class="result-label">Ukuran Rekomendasi</div>
             <div class="result-size">{size}</div>
             <div class="result-standard">Standar EN 13402 · {gender}</div>
         </div>
         <div class="result-right">
-            <div class="conf-label">Kepercayaan</div>
+            <div class="result-label">Kepercayaan</div>
             <div class="conf-value">{conf:.1f}%</div>
             <div class="conf-bar"><div class="conf-fill" style="width:{conf:.1f}%"></div></div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Distribution
-    st.markdown('<div class="section-title">📊 Distribusi Prediksi</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Distribusi Prediksi</div>', unsafe_allow_html=True)
 
     rows = ""
     for s in SIZE_ORDER:
         pct = dist.get(s, 0)
         is_pred = (s == size)
         row_class = "dist-row pred" if is_pred else "dist-row"
-        fill_color = ("linear-gradient(90deg, #4F46E5, #7C3AED)"
-                      if is_pred else "linear-gradient(90deg, #CBD5E1, #94A3B8)")
         rows += f"""
         <div class="{row_class}">
             <div class="dist-label">{s}</div>
-            <div class="dist-bar"><div class="dist-fill" style="width:{pct:.1f}%; background:{fill_color};"></div></div>
+            <div class="dist-bar"><div class="dist-fill" style="width:{pct:.1f}%;"></div></div>
             <div class="dist-pct">{pct:.1f}%</div>
         </div>
         """
 
     st.markdown(f"""
     <div class="dist-list">
-        <div class="dist-header"><span>Ukuran</span><span>Probabilitas</span></div>
         {rows}
     </div>
     """, unsafe_allow_html=True)
 
-    st.divider()
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    # Table EN 13402
-    st.markdown(f'<div class="section-title">📏 Rentang EN 13402 — {gender}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-title">Rentang EN 13402 — {gender}</div>', unsafe_allow_html=True)
 
     tbl = EN13402[gender]
     col_header = "Lingkar Dada" if gender == "Pria" else "Bust"
@@ -641,7 +459,7 @@ if st.button("🔍  Prediksi Ukuran Saya", type="primary", use_container_width=T
     for s in SIZE_ORDER:
         is_pred = (s == size)
         row_class = 'pred-row' if is_pred else ''
-        mark = "✅ Kamu" if is_pred else "—"
+        mark = "✅ Rekomendasi" if is_pred else "—"
         table_rows += f"""
         <tr class="{row_class}">
             <td><strong>{s}</strong></td>
@@ -657,7 +475,7 @@ if st.button("🔍  Prediksi Ukuran Saya", type="primary", use_container_width=T
                 <tr>
                     <th>Ukuran</th>
                     <th>{col_header}</th>
-                    <th></th>
+                    <th>Status</th>
                 </tr>
             </thead>
             <tbody>
@@ -668,15 +486,11 @@ if st.button("🔍  Prediksi Ukuran Saya", type="primary", use_container_width=T
     """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    st.info(
-        "💡 **Catatan:** Prediksi berdasarkan data CAESAR (Amerika/Eropa) & standar EN 13402. "
-        "Ukuran aktual tiap merek pakaian bisa berbeda — gunakan sebagai referensi."
-    )
+    st.info("Catatan: Prediksi berdasarkan data CAESAR (Amerika/Eropa) & standar EN 13402. Ukuran aktual tiap merek pakaian bisa berbeda.")
 
 
 # ── Info model ──────────────────────────────────────────────────────────────
-with st.expander("ℹ️  Tentang Model"):
+with st.expander("Tentang Model"):
     k   = artefak.get("k", "?")
     wv  = artefak.get("w_val", "?")
     acc = artefak.get("holdout_acc", 0) * 100
@@ -693,12 +507,3 @@ with st.expander("ℹ️  Tentang Model"):
 | Hold-out Accuracy | **{acc:.2f}%** |
 | Hold-out F1-macro | **{f1:.2f}%** |
 """)
-
-
-# ── Footer ──────────────────────────────────────────────────────────────────
-st.markdown("""
-<div class="app-footer">
-    <em>Prediksi Ukuran Pakaian Menggunakan Algoritma K-Nearest Neighbor<br>
-    dengan Pembobotan Fitur Lingkar Dada pada Dataset CAESAR</em>
-</div>
-""", unsafe_allow_html=True)
