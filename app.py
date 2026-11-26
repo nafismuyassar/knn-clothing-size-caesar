@@ -145,27 +145,74 @@ html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"]
     background: #FFFFFF !important;
 }
 
-/* Kolom input */
-[data-testid="stNumberInput"] [data-baseweb="input"],
+/* Pilihan jenis kelamin: lingkaran hitam, terpilih biru */
+[data-testid="stRadio"] label[data-baseweb="radio"] > div:first-child {
+    background-color: #FFFFFF !important;
+    border: 2px solid #111418 !important;
+    box-shadow: none !important;
+}
+[data-testid="stRadio"] label[data-baseweb="radio"]:has(input:checked) > div:first-child {
+    background-color: #2563EB !important;
+    border-color: #2563EB !important;
+}
+
+/* Kolom angka: satu garis tepi dengan ketebalan sama di semua sisi */
+[data-testid="stNumberInput"] [data-baseweb="input"] {
+    background: #FFFFFF !important;
+    border: 1.5px solid #111418 !important;
+    border-radius: 10px !important;
+    box-shadow: none !important;
+    outline: none !important;
+    overflow: hidden;
+    height: 2.6rem;
+    align-items: stretch;
+}
+[data-testid="stNumberInput"] [data-baseweb="input"]:focus-within {
+    border-color: #2563EB !important;
+}
 [data-testid="stNumberInput"] [data-baseweb="base-input"] {
     background: #FFFFFF !important;
-    border-radius: 10px !important;
-}
-[data-testid="stNumberInput"] [data-baseweb="input"] {
-    border: 1px solid #C9D0DA !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
 }
 [data-testid="stNumberInput"] input {
-    color: var(--ink) !important;
-    -webkit-text-fill-color: var(--ink) !important;
     background: #FFFFFF !important;
+    color: #111418 !important;
+    -webkit-text-fill-color: #111418 !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    font-weight: 500;
 }
-[data-testid="stNumberInput"] button {
-    background: #EEF1F5 !important;
-    color: var(--ink) !important;
-}
-[data-testid="stNumberInput"] button svg { fill: var(--ink) !important; color: var(--ink) !important; }
 
-/* Tombol */
+/* Tombol plus dan minus: kotak seragam, pas dengan tinggi kolom */
+[data-testid="stNumberInput"] [data-baseweb="input"] button {
+    width: 2.4rem !important;
+    min-width: 2.4rem !important;
+    height: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    background: #F1F3F6 !important;
+    color: #111418 !important;
+    border: none !important;
+    border-left: 1px solid #111418 !important;
+    border-radius: 0 !important;
+}
+[data-testid="stNumberInput"] [data-baseweb="input"] button:hover {
+    background: #E2E7EF !important;
+}
+[data-testid="stNumberInput"] [data-baseweb="input"] button svg {
+    width: 14px !important;
+    height: 14px !important;
+    fill: #111418 !important;
+    color: #111418 !important;
+}
+
+/* Tombol utama */
 .stButton > button {
     background: var(--grad-flat) !important;
     border: none !important;
