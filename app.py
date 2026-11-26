@@ -184,9 +184,8 @@ def main():
     # ── Footer ──
     st.divider()
     st.caption(
-        "Skripsi: *Prediksi Ukuran Pakaian Menggunakan Algoritma K-Nearest Neighbor "
+        "*Prediksi Ukuran Pakaian Menggunakan Algoritma K-Nearest Neighbor "
         "dengan Pembobotan Fitur Lingkar Dada pada Dataset CAESAR* · "
-        "Nafis Muyassar · Universitas Amikom Yogyakarta · 2024"
     )
 
 
